@@ -15,9 +15,6 @@ from torchvision.models.detection import maskrcnn_resnet50_fpn, MaskRCNN_ResNet5
 from matplotlib.colors import TwoSlopeNorm
 
 
-# ==========================================================
-# Utilities: HSV conversion
-# ==========================================================
 def rgb_to_hsv(img):
     r, g, b = img[:, 0], img[:, 1], img[:, 2]
     maxc, _ = torch.max(img, dim=1)
@@ -83,9 +80,6 @@ def hsv_to_rgb(h, s, v):
     return out
 
 
-# ==========================================================
-# A. Pretrained Mask R-CNN (soft union mask)
-# ==========================================================
 class MaskRCNNSegmenter(nn.Module):
     def __init__(self, device):
         super().__init__()
@@ -150,9 +144,6 @@ def crop_resize_2d_batch(x_bhw, bboxes, out_hw=(128, 128)):
     return torch.cat(out, dim=0)
 
 
-# ==========================================================
-# B. Betweenness centrality (Brandes)
-# ==========================================================
 def betweenness_centrality_unweighted(adj: torch.Tensor) -> torch.Tensor:
     A = (adj.detach().cpu() > 0).numpy()
     N = A.shape[0]
@@ -206,9 +197,6 @@ def centrality_weights(adj: torch.Tensor) -> torch.Tensor:
     return w.unsqueeze(1)
 
 
-# ==========================================================
-# C. Chebyshev spectral diffusion (no training needed)
-# ==========================================================
 class ChebDiffusion(nn.Module):
     def __init__(self, K=3):
         super().__init__()
@@ -244,9 +232,6 @@ class ChebDiffusion(nn.Module):
         return out
 
 
-# ==========================================================
-# D. Operators
-# ==========================================================
 class FractalHOperator(nn.Module):
     def forward(self, H):
         return F.avg_pool2d(H.unsqueeze(1), 3, 1, 1).squeeze(1)
@@ -275,11 +260,8 @@ class VGGStyle(nn.Module):
         return self.layers(x)
 
 
-# ==========================================================
-# Sliding-window helpers (Unfold + Fold overlap-add)
-# ==========================================================
 def img_to_nodes_bchw(x_bchw, patch, stride):
-    """
+   
     x_bchw: (B,1,H,W)
     return nodes: (B,N,1), (nH,nW)
     """
@@ -297,28 +279,25 @@ def img_to_nodes_bchw(x_bchw, patch, stride):
 
 
 def nodes_to_img_bchw(nodes_bn1, H, W, patch, stride):
-    """
+   
     nodes_bn1: (B,N,1)
     return: (B,1,H,W) via overlap-add average
-    """
+ 
     B, N, _ = nodes_bn1.shape
     fold = torch.nn.Fold(output_size=(H, W), kernel_size=patch, stride=stride)
 
-    vals = nodes_bn1.transpose(1, 2)          # (B,1,N)
-    vals = vals.repeat(1, patch * patch, 1)   # (B,patch*patch,N)
-    out = fold(vals)                          # (B,1,H,W)
+    vals = nodes_bn1.transpose(1, 2)          
+    vals = vals.repeat(1, patch * patch, 1)  
+    out = fold(vals)                          
 
-    # overlap count normalization
+    
     ones = torch.ones((B, 1, H, W), device=nodes_bn1.device, dtype=nodes_bn1.dtype)
     unfold = torch.nn.Unfold(kernel_size=patch, stride=stride)
-    denom = fold(unfold(ones))                # (B,1,H,W)
+    denom = fold(unfold(ones))                
     out = out / (denom + 1e-8)
     return out
 
 
-# ==========================================================
-# Attack helpers
-# ==========================================================
 def hue_embed(h):
     ang = 2 * math.pi * h
     return torch.cos(ang), torch.sin(ang)
@@ -328,35 +307,33 @@ def graph_smooth_field(field_bhw, adj, diffuser, patch, stride):
     
     
     B, H, W = field_bhw.shape
-    nodes, _ = img_to_nodes_bchw(field_bhw.unsqueeze(1), patch=patch, stride=stride)  # (B,N,1)
+    nodes, _ = img_to_nodes_bchw(field_bhw.unsqueeze(1), patch=patch, stride=stride)  
 
     ys = []
     for b in range(B):
         ys.append(diffuser(nodes[b], adj))  # (N,1)
     y = torch.stack(ys, dim=0)  # (B,N,1)
 
-    smoothed = nodes_to_img_bchw(y, H, W, patch=patch, stride=stride).squeeze(1)  # (B,H,W)
+    smoothed = nodes_to_img_bchw(y, H, W, patch=patch, stride=stride).squeeze(1)  
     return smoothed
 
 
 def qnodes_to_qmap(Q_nodes_n1, H, W, patch, stride, B):
-    """
+    
     Q_nodes_n1: (N,1) -> (B,H,W) continuous map via fold averaging
-    """
+    
     q = Q_nodes_n1.unsqueeze(0).repeat(B, 1, 1)  # (B,N,1)
     qmap = nodes_to_img_bchw(q, H, W, patch=patch, stride=stride).squeeze(1)  # (B,H,W)
     return qmap
 
 
-# ==========================================================
-# Main Attack
-# ==========================================================
+
 def structured_hsv_target_attack(
     src_img, tar_img,
     adj,
     segmenter: MaskRCNNSegmenter,
     block_hw=(16, 16),
-    stride=None,            # NEW
+    stride=None,            
     steps=20,
     eps=8/255,
     alpha=None,
@@ -389,7 +366,7 @@ def structured_hsv_target_attack(
     FH = FractalHOperator().to(device)
     vgg = VGGStyle().to(device)
 
-    # ===== A: masks on BOTH source & target =====
+    
     with torch.no_grad():
         mask_src = segmenter(src_img, score_thr=score_thr, max_instances=max_instances, fallback="all")
         mask_tar = segmenter(tar_img, score_thr=score_thr, max_instances=max_instances, fallback="all")
@@ -397,15 +374,15 @@ def structured_hsv_target_attack(
     bboxes_src = [mask_to_bbox(mask_src[b], thr=0.3, pad=8) for b in range(B)]
     bboxes_tar = [mask_to_bbox(mask_tar[b], thr=0.3, pad=8) for b in range(B)]
 
-    # ===== B: centrality weights =====
+   
     w = centrality_weights(adj).to(device)  # (N,1)
 
-    # ===== C: diffusion template Q_map (node -> pixel via overlap-add) =====
+    
     diffuser = ChebDiffusion(K=cheb_K).to(device)
     z = torch.randn(N, embed_dim, device=device)
     H0 = w * z
-    Q = diffuser(H0, adj)                      # (N,F)
-    Q_nodes = Q.norm(dim=1, keepdim=True)      # (N,1)
+    Q = diffuser(H0, adj)                     
+    Q_nodes = Q.norm(dim=1, keepdim=True)      
     Q_nodes = (Q_nodes - Q_nodes.min()) / (Q_nodes.max() - Q_nodes.min() + 1e-8)
 
     Q_map = qnodes_to_qmap(Q_nodes, H, W, patch=patch, stride=stride, B=B)
@@ -428,7 +405,7 @@ def structured_hsv_target_attack(
         Hs, Ss, Vs = rgb_to_hsv(adv)
         Ht, St, Vt = rgb_to_hsv(tar_img)
 
-        # crop-align
+        
         Hs_c = crop_resize_2d_batch(Hs, bboxes_src, crop_hw)
         Ss_c = crop_resize_2d_batch(Ss, bboxes_src, crop_hw)
         Vs_c = crop_resize_2d_batch(Vs, bboxes_src, crop_hw)
@@ -444,7 +421,7 @@ def structured_hsv_target_attack(
         m_int = (ms_c * mt_c).clamp(0, 1)
         m_align = m_int if (m_int.sum() >= 10).item() else m_u
 
-        # ---- H circular alignment ----
+        
         Hs_cos, Hs_sin = hue_embed(Hs_c)
         Ht_cos, Ht_sin = hue_embed(Ht_c)
 
@@ -458,13 +435,13 @@ def structured_hsv_target_attack(
 
         gH = torch.autograd.grad(loss_H, Hs, retain_graph=True)[0]
 
-        # ---- S style alignment ----
+        
         Fs = vgg((Ss_c * m_u).unsqueeze(1).repeat(1, 3, 1, 1))
         Ft = vgg((St_c * m_u).unsqueeze(1).repeat(1, 3, 1, 1))
         loss_S = F.mse_loss(VGGStyle.gram(Fs), VGGStyle.gram(Ft))
         gS = torch.autograd.grad(loss_S, Ss, retain_graph=True)[0]
 
-        # ---- V frequency alignment ----
+        
         Vf_s = torch.fft.fft2(Vs_c * m_u)
         Vf_t = torch.fft.fft2(Vt_c * m_u)
         loss_freq = F.mse_loss(torch.abs(Vf_s), torch.abs(Vf_t))
@@ -474,7 +451,7 @@ def structured_hsv_target_attack(
         loss_V = loss_freq + lam_hf * loss_hf
         gV = torch.autograd.grad(loss_V, Vs)[0]
 
-        # normalize grads
+        
         gH = gH / (gH.abs().mean(dim=(1, 2), keepdim=True) + 1e-8)
         gS = gS / (gS.abs().mean(dim=(1, 2), keepdim=True) + 1e-8)
         gV = gV / (gV.abs().mean(dim=(1, 2), keepdim=True) + 1e-8)
@@ -489,7 +466,7 @@ def structured_hsv_target_attack(
             gS = gS / (gS.abs().mean(dim=(1, 2), keepdim=True) + 1e-8)
             gV = gV / (gV.abs().mean(dim=(1, 2), keepdim=True) + 1e-8)
 
-        # apply update only on source mask
+        
         M = mask_src
         dH = (Q_map * M) * torch.tanh(lam * gH)
         dS = (Q_map * M) * torch.tanh(lam * gS)
@@ -501,7 +478,7 @@ def structured_hsv_target_attack(
 
         adv_hsv_rgb = hsv_to_rgb(H_adv, S_adv, V_adv)
 
-        # PGD projection in RGB
+        
         delta = torch.clamp(adv_hsv_rgb - src_img, min=-eps, max=eps)
         adv = torch.clamp(src_img + delta, 0, 1).detach()
 
@@ -509,9 +486,6 @@ def structured_hsv_target_attack(
     return adv, perturbation, (mask_src, mask_tar), Q_map
 
 
-# ==========================================================
-# Demo / Entry point
-# ==========================================================
 def load_image(path, size):
     img = Image.open(path).convert('RGB').resize((size, size))
     img = torch.from_numpy(np.array(img)).permute(2, 0, 1).float() / 255.0
@@ -531,8 +505,8 @@ def _viz_enhance(delta_np, q=0.995, gamma=0.5, min_v=1e-4):
     vlim = float(np.quantile(np.abs(delta_np), q))
     vlim = max(vlim, min_v)
 
-    x = np.clip(delta_np / vlim, -1, 1)            # -> [-1,1]
-    x = np.sign(x) * (np.abs(x) ** gamma)          # gamma boost small values
+    x = np.clip(delta_np / vlim, -1, 1)            
+    x = np.sign(x) * (np.abs(x) ** gamma)          
     return x, vlim
 
 
@@ -554,19 +528,19 @@ def plot_paper_panel_hsv(src_img, tar_img, adv_img, eps_rgb, save_path=None,
     dS_np = dS[0].detach().cpu().numpy()
     dV_np = dV[0].detach().cpu().numpy()
 
-    # --- robust + gamma enhance ---
+    
     dH_show, vH = _viz_enhance(dH_np, q=viz_q, gamma=viz_gamma)
     dS_show, vS = _viz_enhance(dS_np, q=viz_q, gamma=viz_gamma)
     dV_show, vV = _viz_enhance(dV_np, q=viz_q, gamma=viz_gamma)
 
     fig = plt.figure(figsize=(14, 7))
 
-    # Row 1
+    
     ax1 = plt.subplot(2, 3, 1); ax1.imshow(np.clip(src,0,1)); ax1.axis('off'); ax1.set_title('Source')
     ax2 = plt.subplot(2, 3, 2); ax2.imshow(np.clip(tar,0,1)); ax2.axis('off'); ax2.set_title('Target')
     ax3 = plt.subplot(2, 3, 3); ax3.imshow(np.clip(adv,0,1)); ax3.axis('off'); ax3.set_title('Adversarial')
 
-    # helper to draw one channel with colorbar labeled in "actual units"
+    
     def draw(ax, show, vlim, title):
         im = ax.imshow(show, cmap='seismic', vmin=-1, vmax=1)
         ax.axis('off')
@@ -610,7 +584,7 @@ def hsv_delta_composite(adv_img, src_img, q=0.995):
     h_norm = np.clip(dH_np / hlim, -1, 1)
     hue = (h_norm * 0.5 + 0.5).astype(np.float32)  # 0..1
 
-    # Value: combined strength from ΔS & ΔV
+    
     strength = np.sqrt((dS_np / slim) ** 2 + (dV_np / vlim) ** 2)
     s_lim2 = float(np.quantile(strength, q)); s_lim2 = max(s_lim2, 1e-6)
     strength = np.clip(strength / s_lim2, 0, 1).astype(np.float32)
@@ -714,7 +688,7 @@ if __name__ == '__main__':
     print("mask_src mean:", mask_src.mean().item(), "mask_tar mean:", mask_tar.mean().item())
     print(f"patch={patch}, stride={stride}, nH={nH}, nW={nW}, N={N}")
 
-    # Visualization
+    
     src_np = to_numpy_img(src_img)
     tar_np = to_numpy_img(tar_img)
     adv_np = to_numpy_img(adv_img)
@@ -726,7 +700,7 @@ if __name__ == '__main__':
     ms_np = mask_src[0].detach().cpu().numpy()
     mt_np = mask_tar[0].detach().cpu().numpy()
 
-    # NEW: 彩色 Δ (HSV composite)
+    
     hsv_comp = hsv_delta_composite(adv_img, src_img, q=0.995)
 
     plt.figure(figsize=(18, 6))

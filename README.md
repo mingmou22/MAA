@@ -26,14 +26,14 @@ Key arguments (defaults follow the paper, Table I):
 
 | Argument | Default | Description |
 |---|---|---|
-| `--img_size` | 224 | input resolution |
-| `--patch_size` | 16 | sliding-window patch size |
-| `--stride` | 2 | sliding-window stride |
-| `--n_steps` | 15 | co-optimization iterations T |
-| `--eps` | 8/255 | RGB ℓ∞ budget |
-| `--cheb_K` | 2 | Chebyshev truncation order K |
-| `--learn_theta` | 1 | 1: per-instance learnable θ; 0: fixed θ_k = 1/(k+1) |
-| `--theta_lr` | 1e-2 | Adam learning rate for θ |
+| `--img_size` || input resolution |
+| `--patch_size` || sliding-window patch size |
+| `--stride` || sliding-window stride |
+| `--n_steps` || co-optimization iterations T |
+| `--eps` || RGB ℓ∞ budget |
+| `--cheb_K` || Chebyshev truncation order K |
+| `--learn_theta` || 1: per-instance learnable θ; 0: fixed θ_k = 1/(k+1) |
+| `--theta_lr` || Adam learning rate for θ |
 
 Setting `--learn_theta 0` reproduces the fixed-filter variant used in the ablation.
 

@@ -37,7 +37,6 @@ Setting `--learn_theta 0` reproduces the fixed-filter variant used in the ablati
 
 ## Notes for Reviewers
 
-- This repository currently contains the **complete method implementation** (all modules required by Algorithm 1) together with a minimal single-pair demo, so that the correctness of the proposed components can be inspected.
 - The full evaluation pipeline (ImageNet victim suites, baseline re-implementations, and experiment configuration files) will be released upon acceptance of the paper.
 - The optimization of θ uses only the HSV-space alignment losses between the source and guidance images; it involves **no** victim-model information at any stage, consistent with the strict black-box threat model defined in the paper.
 

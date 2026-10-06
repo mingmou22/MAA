@@ -24,16 +24,16 @@ Requires Python ≥ 3.9, PyTorch ≥ 2.0, and (recommended) a CUDA-capable GPU. 
 
 Key arguments (defaults follow the paper, Table I):
 
-| Argument | Default | Description |
+| Argument | Description |
 |---|---|---|
-| `--img_size` || input resolution |
-| `--patch_size` || sliding-window patch size |
-| `--stride` || sliding-window stride |
-| `--n_steps` || co-optimization iterations T |
-| `--eps` || RGB ℓ∞ budget |
-| `--cheb_K` || Chebyshev truncation order K |
-| `--learn_theta` || 1: per-instance learnable θ; 0: fixed θ_k = 1/(k+1) |
-| `--theta_lr` || Adam learning rate for θ |
+| `--img_size` | input resolution |
+| `--patch_size` |sliding-window patch size |
+| `--stride` | sliding-window stride |
+| `--n_steps` | co-optimization iterations T |
+| `--eps` | RGB ℓ∞ budget |
+| `--cheb_K` | Chebyshev truncation order K |
+| `--learn_theta` | 1: per-instance learnable θ; 0: fixed θ_k = 1/(k+1) |
+| `--theta_lr` | Adam learning rate for θ |
 
 Setting `--learn_theta 0` reproduces the fixed-filter variant used in the ablation.
 

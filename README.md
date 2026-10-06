@@ -30,7 +30,7 @@ Key arguments:
 | `--n_steps` | co-optimization iterations T |
 | `--eps` | RGB ℓ∞ budget |
 | `--cheb_K` | Chebyshev truncation order K |
-| `--learn_theta` | 1: per-instance learnable θ; 0: fixed θ_k = 1/(k+1) |
+| `--learn_theta` | per-instance learnable θ; 0: fixed θ_k = 1/(k+1) |
 | `--theta_lr` | Adam learning rate for θ |
 
 Setting `--learn_theta 0` reproduces the fixed-filter variant used in the ablation.

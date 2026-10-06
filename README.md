@@ -14,15 +14,13 @@ Per sample, the attack proceeds in four stages:
 3. **Spectral perturbation propagation** — a K-order Chebyshev spectral graph filter diffuses the centrality-weighted perturbation over multi-hop neighborhoods. The per-order filter weights θ are *learnable*: within the T attack iterations, θ is updated by Adam through a one-step lookahead on the channel alignment losses, co-optimized with the perturbation itself. The optimization signal comes exclusively from HSV-space alignment objectives — no victim output, gradient, or parameter is ever accessed.
 4. **Channel-wise perturbation generation** — channel-specific alignment losses against the target image: circular (fractal) alignment for H, Gram-matrix style alignment for S (frozen VGG-19 features), and Fourier-spectrum alignment with high-frequency suppression for V. The final perturbation is template-modulated and projected onto the RGB ℓ∞ ball.
 
-
-
 Requires Python ≥ 3.9, PyTorch ≥ 2.0, and (recommended) a CUDA-capable GPU. The first run downloads pretrained Mask R-CNN and VGG-19 weights from torchvision automatically.
 
 ## Quick Start
 
 
 
-Key arguments (defaults follow the paper, Table I):
+Key arguments:
 
 | Argument | Description |
 |---|---|---|

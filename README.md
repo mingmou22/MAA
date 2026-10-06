@@ -14,42 +14,13 @@ Per sample, the attack proceeds in four stages:
 3. **Spectral perturbation propagation** — a K-order Chebyshev spectral graph filter diffuses the centrality-weighted perturbation over multi-hop neighborhoods. The per-order filter weights θ are *learnable*: within the T attack iterations, θ is updated by Adam through a one-step lookahead on the channel alignment losses, co-optimized with the perturbation itself. The optimization signal comes exclusively from HSV-space alignment objectives — no victim output, gradient, or parameter is ever accessed.
 4. **Channel-wise perturbation generation** — channel-specific alignment losses against the target image: circular (fractal) alignment for H, Gram-matrix style alignment for S (frozen VGG-19 features), and Fourier-spectrum alignment with high-frequency suppression for V. The final perturbation is template-modulated and projected onto the RGB ℓ∞ ball.
 
-## Repository Structure
 
-```
-MAA/
-├── maa/
-│   ├── __init__.py
-│   ├── color.py          # differentiable RGB<->HSV conversion, hue embedding
-│   ├── segmentation.py   # frozen Mask R-CNN foreground masks, bbox/crop helpers
-│   ├── graph.py          # grid adjacency, Brandes betweenness centrality
-│   ├── diffusion.py      # Chebyshev spectral filter (per-instance learnable θ)
-│   ├── operators.py      # fractal operator (H), VGG-19 Gram style (S)
-│   ├── patches.py        # sliding-window patch<->node mapping, graph smoothing
-│   └── attack.py         # main attack: co-optimization of perturbation and θ
-├── main.py               # minimal single-pair demo
-├── requirements.txt
-└── README.md
-```
-
-## Installation
-
-```bash
-git clone https://github.com/mingmou22/MAA.git
-cd MAA
-pip install -r requirements.txt
-```
 
 Requires Python ≥ 3.9, PyTorch ≥ 2.0, and (recommended) a CUDA-capable GPU. The first run downloads pretrained Mask R-CNN and VGG-19 weights from torchvision automatically.
 
 ## Quick Start
 
-```bash
-python main.py \
-    --img path/to/source.png \
-    --target_img path/to/target.jpg \
-    --save adv.png
-```
+
 
 Key arguments (defaults follow the paper, Table I):
 
